@@ -1,2 +1,2 @@
 # AI-train-controller
-It will help the raailway department to manage train traffic using AI
+It will help the railway department to manage train traffic using AI
