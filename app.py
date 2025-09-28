@@ -12,19 +12,30 @@ import plotly.express as px
 # ===============================
 # 🚆 Streamlit Setup
 # ===============================
-st.set_page_config(layout="wide", page_title="🚆 AI Train Traffic Dashboard")
-st.title("🚆 AI Train Traffic Dashboard")
+st.set_page_config(layout="wide", page_title="MaxRail AI Dashboard")
+st.title("MaxRail AI Dashboard")
 
 # ===============================
 # 🎨 Custom IRCTC Control Room Styling
 # ===============================
 
 st.markdown("""
-    <style>
+    Welcome to **MaxRail AI**!  
+    - Analyze your rail simulations quickly.  
+    - Optimize routes and efficiency.  
+    - Interactive and easy-to-use interface.
+    - Harness AI-driven insights to reduce delays and improve scheduling.  
+    - Visualize rail network performance in real time for smarter decisions.
+
+    """)
+
+st.markdown("""
+   <style>
     body {background-color: #0f172a; color: #f8fafc; font-family: "Segoe UI", sans-serif;}
     h1, h2, h3 {color: #38bdf8; font-weight: bold;}
     .css-1d391kg {background-color: #1e293b;} /* Sidebar */
     .css-1d391kg h2, .css-1d391kg label {color: white;}
+
 
     /* KPI cards */
     .kpi-card {
@@ -58,10 +69,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# ===============================
-# 🚂 Main Control Room App
-# ===============================
-st.title("🚆 IRCTC Railway Control Room Dashboard")
+
 
 #----Sidebar----
 
@@ -73,7 +81,7 @@ with st.sidebar:
     episode_time = st.sidebar.slider("Simulation Steps", 100, 1000, 400)
     steps = st.slider("Simulation Episodes", 10, 100, 50)
     
-    st.header("Controller")
+    st.header("Control Panel")
     controller_mode = st.radio("Select Controller Mode", ["Baseline", "AI Model", "Compare AI vs Baseline"])
     run_button = st.button("▶ Run_Simulation", key="run_sim_button1")
 
@@ -82,10 +90,7 @@ with st.sidebar:
     run1_button = st.button("▶ Run Simulation",key="run_sim_button2")
 
 
-    st.header("Control Panel")
-    scenario1=st.selectbox("All Features Available",["Show KPI's","Live Map","Train Schedule ","Congestion Heat Map","Scenario Tester","Audit Trail"])
-    run2_button = st.button("▶ Run Simulation",key="run_sim_button3")
-
+   
     
 MAX_TRAINS = 10  # fixed max trains for RL model input size
 
@@ -186,7 +191,7 @@ def plot_kpi_curves(traj):
     fig.add_trace(go.Scatter(x=steps, y=traj["passed"], mode="lines+markers", name="🚆 Throughput"))
     fig.add_trace(go.Scatter(x=steps, y=traj["violations"], mode="lines+markers", name="⚠ Safety Violations"))
     fig.add_trace(go.Scatter(x=steps, y=traj["fuel"], mode="lines+markers", name="⛽ Fuel Proxy"))
-    fig.update_layout(title="📊 KPI Evolution Over Time", xaxis_title="Time Step", yaxis_title="Value", template="plotly_dark")
+    fig.update_layout(title="📊 KPI Evolution Over Time", xaxis_title="Time Step", yaxis_title="Value", template="plotly_white")
     st.plotly_chart(fig, use_container_width=True)
 
 def predict_delays(velocities, positions, assigned_tracks):
@@ -234,14 +239,18 @@ if run_button:
         # Compare KPIs
         col1, col2 = st.columns(2)
         with col1:
-            st.metric("🚆 Throughput (RL)", f"{traj_rl['passed'][-1]} trains")
-            st.metric("⚠ Safety Violations (RL)", f"{traj_rl['violations'][-1]}")
-            st.metric("⛽ Fuel Proxy (RL)", f"{traj_rl['fuel'][-1]:.2f}")
-        with col2:
-            st.metric("🚆 Throughput (Baseline)", f"{traj_base['passed'][-1]} trains")
-            st.metric("⚠ Safety Violations (Baseline)", f"{traj_base['violations'][-1]}")
-            st.metric("⛽ Fuel Proxy (Baseline)", f"{traj_base['fuel'][-1]:.2f}")
+           throughput_rl = traj_rl['passed'][-1] / (max(1, len(traj_rl['passed']))/60)
+           st.metric("🚆 Throughput (RL)", f"{throughput_rl:.2f} trains/hour")
+           st.metric("⚠ Safety Violations (RL)", f"{traj_rl['violations'][-1]}")
+           st.metric("⛽ Fuel Proxy (RL)", f"{traj_rl['fuel'][-1]:.2f}")
 
+        with col2:
+           throughput_base = traj_base['passed'][-1] / (max(1, len(traj_base['passed']))/60)
+           st.metric("🚆 Throughput (Baseline)", f"{throughput_base:.2f} trains/hour")
+           st.metric("⚠ Safety Violations (Baseline)", f"{traj_base['violations'][-1]}")
+           st.metric("⛽ Fuel Proxy (Baseline)", f"{traj_base['fuel'][-1]:.2f}")
+
+       
         # KPI Comparison Plot
         fig = go.Figure()
         steps = np.arange(len(traj_rl["fuel"]))
@@ -251,8 +260,37 @@ if run_button:
         fig.add_trace(go.Scatter(x=steps, y=traj_base["violations"], mode="lines", name="Baseline Safety Violations"))
         fig.add_trace(go.Scatter(x=steps, y=traj_rl["fuel"], mode="lines", name="RL Fuel Proxy"))
         fig.add_trace(go.Scatter(x=steps, y=traj_base["fuel"], mode="lines", name="Baseline Fuel Proxy"))
-        fig.update_layout(title="📊 RL vs Baseline KPI Comparison", template="plotly_dark")
+        fig.update_layout(title="📊 RL vs Baseline KPI Comparison", template="plotly_white")
         st.plotly_chart(fig, use_container_width=True)
+
+        fig = go.Figure()
+        steps = np.arange(len(traj_rl["fuel"]))
+
+        # Throughput per hour
+        throughput_rl = np.array(traj_rl["passed"]) / ((steps+1)/60)
+        throughput_base = np.array(traj_base["passed"]) / ((steps+1)/60)
+
+        
+        radar = go.Figure()
+
+        categories = ["Throughput", "Safety", "Fuel"]
+        rl_values = [throughput_rl[-1], -traj_rl["violations"][-1], traj_rl["fuel"][-1]]
+        base_values = [throughput_base[-1], -traj_base["violations"][-1], traj_base["fuel"][-1]]
+
+        radar.add_trace(go.Scatterpolar(r=rl_values, theta=categories, fill="toself", name="RL"))
+        radar.add_trace(go.Scatterpolar(r=base_values, theta=categories, fill="toself", name="Baseline"))
+
+        radar.update_layout(title="⚖ Performance Profile", polar=dict(radialaxis=dict(visible=True)))
+        st.plotly_chart(radar, use_container_width=True)
+
+        rl_score = throughput_rl[-1] - traj_rl["violations"][-1]*2 + traj_rl["fuel"][-1]/50
+        base_score = throughput_base[-1] - traj_base["violations"][-1]*2 + traj_base["fuel"][-1]/50
+
+        st.metric("🏆 RL Efficiency Score", f"{rl_score:.2f}")
+        st.metric("🏆 Baseline Efficiency Score", f"{base_score:.2f}")
+
+
+
 
     else:
         # Single simulation
@@ -264,7 +302,8 @@ if run_button:
 
         # KPIs
         col1, col2, col3 = st.columns(3)
-        col1.metric("🚆 Throughput", f"{traj['passed'][-1]} trains")
+        # For single simulation
+        col1.metric("🚆 Throughput", f"{traj['passed'][-1] / (max(1, len(traj['passed']))/60):.2f} trains/hour")
         col2.metric("⚠ Safety Violations", f"{traj['violations'][-1]}")
         col3.metric("⛽ Fuel Proxy", f"{traj['fuel'][-1]:.2f}")
 
@@ -415,7 +454,7 @@ def live_map(traj, env):
             dtick=1,
             range=[-0.5, env.n_tracks - 0.5]  # always show correct number of tracks
         ),
-        template="plotly_dark",
+        template="plotly_white",
         height=500
     )
     st.plotly_chart(fig, use_container_width=True)
@@ -483,7 +522,7 @@ def live_map(traj, env):
             dtick=1,
             range=[-0.5, env.n_tracks - 0.5]
         ),
-        template="plotly_dark",
+        template="plotly_white",
         height=600,
         updatemenus=[{
             "type": "buttons",
@@ -542,7 +581,7 @@ def show_scheduler(env):
         barmode="stack",
         xaxis_title="Track Position (Distance Units)",
         yaxis_title="Train",
-        template="plotly_dark",
+        template="plotly_white",
         height=400
     )
     st.plotly_chart(fig, use_container_width=True)
@@ -583,7 +622,7 @@ def show_congestion(traj, env):
     fig = go.Figure(data=go.Heatmap(z=usage.T, colorscale="YlOrRd"))
     fig.update_layout(title="🚦 Track Congestion Heatmap", xaxis_title="Time Step", yaxis_title="Track")
     st.plotly_chart(fig, use_container_width=True)
-    if n_trains >=10:
+    if n_tracks==5 and n_trains==10:
         st.markdown("<div class='alert-signal danger'>❌ Too Much Rush - Just Descrease no. of Trains or Increase no. of Tracks</div>", unsafe_allow_html=True)
     
 
@@ -669,59 +708,4 @@ class TrainEnv:
 
 
  
-#========================================
-#-------------- Control Panel------------
-#========================================
 
-
-
-
-
-if run2_button:
-    env = TrainEnv(n_trains, n_tracks, steps)
-    traj = env.simulate()
-
-    
-
-# Scenario handlers
-    if scenario1 == "Live Map":
-        try:
-            live_map(traj, env)
-        except Exception as e:
-            st.error(f"Error in Live Map: {e}")
-
-    elif scenario1 == "Train Schedule":
-        try:
-            conflict_free_scheduler(env)
-            show_scheduler(env)
-        except Exception as e:
-            st.error(f"Error in Train Schedule: {e}")
-
-    elif scenario1 == "Congestion Heat Map":
-        try:
-            show_congestion(traj, env)
-        except Exception as e:
-            st.error(f"Error in Congestion Heat Map: {e}")
-
-    elif scenario1 == "Scenario Tester":
-        try:
-            scenario_tester(env)
-        except Exception as e:
-            st.error(f"Error in Scenario Tester: {e}")
-
-    elif scenario1 == "Audit Trail":
-        try:
-            audit_entry = log_run(
-            {"n_trains": n_trains, "n_tracks": n_tracks, "scenario": scenario1}, traj
-        )
-            st.session_state.setdefault("audit", []).append(audit_entry)
-            show_audit_trail(st.session_state["audit"])
-        except Exception as e:
-            st.error(f"Error in Audit Trail: {e}")
-
-    elif scenario1 == "KPI":
-        try:
-            # Replace `show_kpi` with the actual KPI function you have
-            show_kpi(env, traj)
-        except Exception as e:
-            st.error(f"Error in KPI: {e}")
